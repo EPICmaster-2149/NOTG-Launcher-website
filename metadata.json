@@ -1,0 +1,8 @@
+{
+  "name": "Remix: Minecraft Launcher Website",
+  "description": "An immersive showcase, launcher dashboard simulator, and AI performance advisor for a custom Minecraft launcher.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
