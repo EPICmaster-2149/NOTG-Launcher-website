@@ -39,12 +39,16 @@ import manageInstanceImg from "./Manage instance.png";
 import launcherLogoImg from "./NOTG-Launcher Logo.png";
 
 export default function App() {
-  // Animation Progress States
+  // Intro animation phase: 'typing' -> 'transitioning' -> 'settled' -> 'hidden'
+  const [introPhase, setIntroPhase] = useState<"typing" | "transitioning" | "settled" | "hidden">("typing");
+
+  // Derived states from introPhase
+  const isTypingLogo = introPhase === "typing";
+  const isFinished = introPhase === "transitioning" || introPhase === "settled" || introPhase === "hidden";
+  const isLogoSettled = introPhase === "settled" || introPhase === "hidden";
+
+  // Typed logo lines accumulator
   const [typedLogoLines, setTypedLogoLines] = useState<string[]>([]);
-  const [isTypingLogo, setIsTypingLogo] = useState(true);
-  const [isFinished, setIsFinished] = useState(false);
-  const [isLogoSettled, setIsLogoSettled] = useState(false);
-  const [showNavbar, setShowNavbar] = useState(false);
 
   // Section Headings complete trigger states for cascading content animations
   const [coreFeaturesHeaderLoaded, setCoreFeaturesHeaderLoaded] = useState(false);
@@ -68,36 +72,12 @@ export default function App() {
 
   // References
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const logoPlaceholderRef = useRef<HTMLDivElement | null>(null);
   const additionalSectionRef = useRef<HTMLElement>(null);
   const isAdditionalSectionInView = useInView(additionalSectionRef, { amount: 0.15 });
-  const [logoOffset, setLogoOffset] = useState({ x: 0, y: 0, scale: 1 });
 
-  // Rotator timer for additional features (pauses on exact hovered card, only works when section is in viewport)
-  useEffect(() => {
-    if (!isAdditionalSectionInView) return;
+  const [showNavbar, setShowNavbar] = useState(false);
 
-    const rotatorTimer = setInterval(() => {
-      if (hoveredCardIdx === null) {
-        setActiveFeatureIdx(prev => (prev + 1) % additionalFeatures.length);
-      }
-    }, 5000); // rotate showcase every 5s if not hovering over a card
-
-    return () => clearInterval(rotatorTimer);
-  }, [hoveredCardIdx, isAdditionalSectionInView, additionalFeatures.length]);
-
-  // Interval for Braille animation during downloading state
-  useEffect(() => {
-    if (downloadState !== "downloading") return;
-    const interval = setInterval(() => {
-      setBrailleIdx((prev) => (prev + 1) % 10);
-    }, 80);
-    return () => clearInterval(interval);
-  }, [downloadState]);
-
-  const brailleFrames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
-  const brailleChar = brailleFrames[brailleIdx];
-
+  // Refs for particle animation (no re-renders needed)
   const isFinishedRef = useRef(isFinished);
   const isTypingLogoRef = useRef(isTypingLogo);
   const currentThemeRef = useRef(currentTheme);
@@ -115,58 +95,38 @@ export default function App() {
     currentThemeRef.current = currentTheme;
   }, [currentTheme]);
 
-  // Calculate center offset for logo typing stage
+  // SVG path for logo scale animation — starts big, shrinks to normal
+  const logoScale = isTypingLogo ? 2.2 : 1;
+
+  // Rotator timer for additional features (pauses on exact hovered card, only works when section is in viewport)
   useEffect(() => {
-    const updateOffset = () => {
-      if (!isTypingLogo) {
-        setLogoOffset({ x: 0, y: 0, scale: 1 });
-        return;
-      }
-      if (logoPlaceholderRef.current) {
-        const rect = logoPlaceholderRef.current.getBoundingClientRect();
-        const viewportX = window.innerWidth / 2;
-        const viewportY = window.innerHeight / 2;
-        
-        // Target center of the placeholder
-        const placeholderX = rect.left + rect.width / 2;
-        const placeholderY = rect.top + rect.height / 2;
-        
-        // Distance to move from placeholder center to screen center
-        const x = viewportX - placeholderX;
-        const y = viewportY - placeholderY;
-        
-        // Scale factor for mobile / desktop
-        let scale = 1.8;
-        if (window.innerWidth < 400) {
-          scale = 0.7; 
-        } else if (window.innerWidth < 640) {
-          scale = 0.85; 
-        } else if (window.innerWidth < 768) {
-          scale = 1.1;
-        } else if (window.innerWidth < 1024) {
-          scale = 1.4;
-        }
-        
-        setLogoOffset({ x, y, scale });
-      }
-    };
+    if (!isAdditionalSectionInView) return;
 
-    updateOffset();
-    const interval = setInterval(updateOffset, 100);
+    const rotatorTimer = setInterval(() => {
+      if (hoveredCardIdx === null) {
+        setActiveFeatureIdx((prev: number) => (prev + 1) % additionalFeatures.length);
+      }
+    }, 5000); // rotate showcase every 5s if not hovering over a card
 
-    window.addEventListener("resize", updateOffset);
-    return () => {
-      clearInterval(interval);
-      window.removeEventListener("resize", updateOffset);
-    };
-  }, [isTypingLogo]);
+    return () => clearInterval(rotatorTimer);
+  }, [hoveredCardIdx, isAdditionalSectionInView, additionalFeatures.length]);
+
+  // Interval for Braille animation during downloading state
+  useEffect(() => {
+    if (downloadState !== "downloading") return;
+    const interval = setInterval(() => {
+      setBrailleIdx((prev: number) => (prev + 1) % 10);
+    }, 80);
+    return () => clearInterval(interval);
+  }, [downloadState]);
+
+  const brailleFrames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+  const brailleChar = brailleFrames[brailleIdx];
 
   // Skip animation trigger
   const handleSkipAnimation = () => {
     setTypedLogoLines(LOGO_LINES);
-    setIsTypingLogo(false);
-    setIsFinished(true);
-    setIsLogoSettled(true);
+    setIntroPhase("settled");
     setShowNavbar(true);
   };
 
@@ -260,16 +220,8 @@ export default function App() {
     };
     window.addEventListener("resize", handleResize);
 
-    // =========================================================================
-    // CUSTOMIZE PARTICLE EFFECT HERE:
-    // - To change characters: Edit the 'chars' array below.
-    // - To change quantity: Increase 'rowsCount' or 'colsCount' below.
-    // - To change scale: Modify the 'scale' property.
-    // - To change movement speed: Modify the 'speed' property.
-    // =========================================================================
     const chars = ["▲", "◆", "■", "░", "▒", "▓", "+", "%", "#", "<", ">", "{", "}"];
     
-    // Balanced density: draw 84 active particles for an elegant, beautifully subtle background wave
     if (particlesRef.current.length === 0) {
       const rowsCount = 7;
       const colsCount = 12;
@@ -289,45 +241,38 @@ export default function App() {
     }
 
     let t = 0;
-    let introIntensity = 1.0; // starts fully supercharged
+    let introIntensity = 1.0;
 
     const renderWaves = () => {
-      // Interpolate booting intensity
       if (!isFinishedRef.current) {
         introIntensity = 1.0;
       } else if (introIntensity > 0) {
-        introIntensity -= 0.012; // smoothly decays over ~1.3 seconds
+        introIntensity -= 0.012;
         if (introIntensity < 0) introIntensity = 0;
       }
 
-      // Swirl faster and more energetically during booting, then ease to gentle drift
       const speedMultiplier = 1.0 + 3.0 * introIntensity;
       t += 1 * speedMultiplier;
       
       ctx.clearRect(0, 0, width, height);
 
       const activeTheme = currentThemeRef.current;
-      ctx.font = "14px monospace"; // larger size for premium readability
+      ctx.font = "14px monospace";
       
-      // Use rich solid theme colors for maximum visibility and contrast
       const particleColors: Record<string, string> = {
-        cosmic: "#818cf8", // Indigo
-        matrix: "#34d399", // Emerald
-        sunset: "#fbbf24", // Amber
-        ender: "#e879f9",  // Fuchsia
-        ocean: "#22d3ee"   // Cyan
+        cosmic: "#818cf8",
+        matrix: "#34d399",
+        sunset: "#fbbf24",
+        ender: "#e879f9",
+        ocean: "#22d3ee"
       };
       ctx.fillStyle = particleColors[activeTheme] || "#818cf8";
-
-      // Glow is completely removed to keep symbols sharp and clean
       ctx.shadowBlur = 0;
 
-      particlesRef.current.forEach((p) => {
-        // Individual speed multiplier for each particle for maximum fluidity
+      particlesRef.current.forEach((p: { x: number; y: number; offset: number; speed: number; char: string; scale: number }) => {
         const particleSpeed = p.speed * 160 + 0.04;
         const driftX = t * particleSpeed;
         
-        // Wrap coordinate smoothly around the edges
         let currentX = (p.x - driftX) % (width + 120);
         if (currentX < -60) {
           currentX = (currentX + (width + 120)) % (width + 120);
@@ -336,13 +281,9 @@ export default function App() {
         const verticalDrift = Math.sin(t * p.speed + p.offset) * 20;
         const currentY = p.y + verticalDrift + Math.cos((currentX + t) * 0.005) * 8;
 
-        // Alpha calculations for fading borders
         const edgeAlpha = Math.min(currentX / 100, (width - currentX) / 100, currentY / 100, (height - currentY) / 100);
-        
-        // Balanced idle visibility to keep the background elegant and non-distracting
         const stdAlpha = Math.max(0.08, Math.min(0.24, edgeAlpha)) * p.scale * 0.45;
         const introAlpha = Math.min(0.7, edgeAlpha * 4.0) * p.scale * 0.9;
-        
         const baseAlpha = stdAlpha * (1 - introIntensity) + introAlpha * introIntensity;
         const scaleMultiplier = 1.0 + 0.6 * introIntensity;
 
@@ -381,7 +322,7 @@ export default function App() {
         const charsToType = Math.min(3, fullLine.length - charIndex);
         if (charsToType > 0) {
           currentLineBuffer += fullLine.substring(charIndex, charIndex + charsToType);
-          setTypedLogoLines((prev) => {
+          setTypedLogoLines((prev: string[]) => {
             const copy = [...prev];
             copy[lineIndex] = currentLineBuffer;
             return copy;
@@ -395,18 +336,18 @@ export default function App() {
       } else {
         clearInterval(typeTimer);
         
-        // Cinema transition sequence
+        // Typing done → transition to shrink to place
         setTimeout(() => {
-          setIsTypingLogo(false);
-          setIsFinished(true);
+          setTypedLogoLines(LOGO_LINES);
+          setIntroPhase("transitioning");
           
           setTimeout(() => {
             setShowNavbar(true);
-          }, 400);
+          }, 700);
 
           setTimeout(() => {
-            setIsLogoSettled(true);
-          }, 1800);
+            setIntroPhase("settled");
+          }, 1500);
         }, 500);
       }
     }, 10);
@@ -416,7 +357,7 @@ export default function App() {
 
   // Prevent scrolling during starting intro animation
   useEffect(() => {
-    if (!isFinished) {
+    if (introPhase === "typing") {
       document.body.style.overflow = "hidden";
       document.documentElement.style.overflow = "hidden";
     } else {
@@ -427,11 +368,11 @@ export default function App() {
       document.body.style.overflow = "";
       document.documentElement.style.overflow = "";
     };
-  }, [isFinished]);
+  }, [introPhase]);
 
   const logoProgressPercent = isFinished
     ? 100
-    : Math.round((typedLogoLines.filter((line) => line.trim().length > 0).length / LOGO_LINES.length) * 100) || 0;
+    : Math.round((typedLogoLines.filter((line: string) => line.trim().length > 0).length / LOGO_LINES.length) * 100) || 0;
 
   return (
     <div
@@ -442,16 +383,10 @@ export default function App() {
       {/* Wave Symbol Background Canvas */}
       <canvas ref={canvasRef} className="fixed inset-0 w-full h-full pointer-events-none z-0 animate-[pulse_10s_ease-in-out_infinite]" />
 
-      {/* Cinematic Centered Intro Overlay */}
-      <div
-        className={`fixed inset-0 z-30 transition-all duration-[1500ms] ease-[cubic-bezier(0.16,1,0.3,1)] ${
-          isFinished
-            ? "opacity-0 pointer-events-none scale-95 blur-md"
-            : "opacity-100 bg-[#03050d]/80 backdrop-blur-md"
-        }`}
-      >
-        {/* Pulsing Ambient Glow (Breathes and shines beautifully behind the booting logo) */}
-        {!isFinished && (
+      {/* Cinematic Centered Intro Overlay — only visible during typing */}
+      {introPhase === "typing" && (
+        <div className="fixed inset-0 z-30 bg-[#03050d]/80 backdrop-blur-md">
+          {/* Pulsing Ambient Glow */}
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden">
             <motion.div 
               animate={{
@@ -466,10 +401,8 @@ export default function App() {
               className="w-[85vw] h-[85vw] max-w-[600px] max-h-[600px] rounded-full bg-gradient-to-tr from-indigo-500/25 via-purple-500/20 to-pink-500/10 filter blur-[90px]"
             />
           </div>
-        )}
 
-        {/* Skip Intro Trigger at Bottom */}
-        {!isFinished && (
+          {/* Skip Intro Button */}
           <div className="absolute bottom-16 left-0 right-0 z-50 flex items-center justify-center py-4 px-6 pointer-events-auto">
             <motion.button
               id="fast-skip-trigger"
@@ -483,8 +416,13 @@ export default function App() {
               <ChevronRight className="w-3.5 h-3.5" />
             </motion.button>
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {/* Overlay fade-out transition */}
+      {introPhase === "transitioning" && (
+        <div className="fixed inset-0 z-30 transition-all duration-[1500ms] ease-[cubic-bezier(0.16,1,0.3,1)] opacity-0 pointer-events-none scale-95 blur-md bg-[#03050d]/80" />
+      )}
 
       {/* Modern Top Dropdown Header */}
       <header
@@ -549,37 +487,52 @@ export default function App() {
           {/* Left Column: Logo & Info */}
           <div className="lg:col-span-5 flex flex-col gap-6 justify-center">
             
-            {/* Logo ASCII Container with Cinematic Settling transition */}
-            <div 
-              className={
-                isFinished 
-                  ? "relative overflow-visible min-h-[140px] sm:min-h-[160px] md:min-h-[180px] flex items-center justify-center lg:justify-start w-fit mx-auto lg:mx-0"
-                  : "fixed inset-0 z-50 flex items-center justify-center pointer-events-none"
-              }
-            >
-              <motion.pre
-                layout
-                transition={{
-                  type: "spring",
-                  stiffness: 85,
-                  damping: 17,
-                }}
-                style={{
-                  fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
-                  fontWeight: 900,
-                  letterSpacing: "-0.05em",
-                  lineHeight: "0.82",
-                  textShadow: "0 0 0.2px currentColor",
-                }}
-                className={`text-left text-[6.5px] min-[380px]:text-[7.5px] min-[480px]:text-[9px] sm:text-[10px] md:text-xs select-none overflow-x-visible whitespace-pre text-white w-fit mx-auto lg:mx-0 ${
-                  isFinished && isLogoSettled ? "animate-logo-float" : ""
-                }`}
-              >
-                {isFinished ? LOGO_LINES.join("\n") : typedLogoLines.join("\n")}
-              </motion.pre>
-            </div>
+            {/* Logo - TWO SEPARATE elements, no layout, no sliding during typing */}
+            {introPhase === "typing" ? (
+              <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
+                <pre
+                  style={{
+                    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+                    fontWeight: 900,
+                    letterSpacing: "-0.05em",
+                    lineHeight: "0.82",
+                    textShadow: "0 0 0.2px currentColor",
+                    transform: "scale(2.2)",
+                  }}
+                  className="text-left text-[6.5px] min-[380px]:text-[7.5px] min-[480px]:text-[9px] sm:text-[10px] md:text-xs select-none overflow-x-visible whitespace-pre text-white"
+                >
+                  {typedLogoLines.join("\n")}
+                </pre>
+              </div>
+            ) : (
+              <div className="relative overflow-visible min-h-[140px] sm:min-h-[160px] md:min-h-[180px] flex items-center justify-center lg:justify-start w-fit mx-auto lg:mx-0">
+                <motion.pre
+                  initial={{ scale: 2.2, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{
+                    type: "spring",
+                    stiffness: 120,
+                    damping: 20,
+                    mass: 1,
+                  }}
+                  style={{
+                    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+                    fontWeight: 900,
+                    letterSpacing: "-0.05em",
+                    lineHeight: "0.82",
+                    textShadow: "0 0 0.2px currentColor",
+                    transformOrigin: "center center",
+                  }}
+                  className={`text-left text-[6.5px] min-[380px]:text-[7.5px] min-[480px]:text-[9px] sm:text-[10px] md:text-xs select-none overflow-x-visible whitespace-pre text-white w-fit mx-auto lg:mx-0 ${
+                    isLogoSettled ? "animate-logo-float" : ""
+                  }`}
+                >
+                  {LOGO_LINES.join("\n")}
+                </motion.pre>
+              </div>
+            )}
 
-            {/* Launcher description container */}
+            {/* Launcher description container — fades in after logo settles */}
             <motion.div
               initial={{ opacity: 0, y: 15 }}
               animate={isFinished ? { opacity: 1, y: 0 } : { opacity: 0, y: 15 }}
@@ -719,7 +672,7 @@ export default function App() {
             </h2>
           </div>
 
-          {/* Features Column Stacks (Fades and slides in beautifully only when header is fully typewriter-completed) */}
+          {/* Features Column Stacks */}
           {coreFeaturesHeaderLoaded && (
             <motion.div 
               initial={{ opacity: 0, y: 25 }}
@@ -886,7 +839,7 @@ export default function App() {
                 <span className="text-[10px] font-mono text-amber-500/70 uppercase tracking-widest font-bold">Select Feature Overview</span>
                 
                 <div className="flex flex-col gap-3">
-                  {additionalFeatures.map((feat, idx) => {
+                  {additionalFeatures.map((feat: any, idx: number) => {
                     const isActive = idx === activeFeatureIdx;
                     const IconComponent = feat.icon;
                     return (
@@ -1017,7 +970,7 @@ export default function App() {
               }}
               className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-16"
             >
-              {EXTRA_FEATURES.map((item, idx) => {
+              {EXTRA_FEATURES.map((item: any, idx: number) => {
                 const Icon = item.icon;
                 return (
                   <motion.div
@@ -1193,6 +1146,7 @@ export default function App() {
                   alt="N"
                   className="w-full h-full object-cover"
                   referrerPolicy="no-referrer"
+                  loading="lazy"
                 />
               </div>
               <span className="font-display font-extrabold text-lg text-white select-none">NOTG Launcher</span>
