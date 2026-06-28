@@ -36,7 +36,12 @@
 
 @keyframes blink-cursor {
   0%, 100% { opacity: 1; }
-  50% { opacity: 0; }
+  50% { opacity: 0.15; }
+}
+
+@keyframes cursor-glow {
+  0%, 100% { box-shadow: 0 0 8px rgba(99,102,241,0.6), 0 0 20px rgba(99,102,241,0.2); }
+  50% { box-shadow: 0 0 4px rgba(99,102,241,0.2), 0 0 10px rgba(99,102,241,0.05); }
 }
 
 @keyframes fade-in-scale {

@@ -7,15 +7,16 @@ import dotenv from "dotenv";
 // Load environment variables
 dotenv.config();
 
-// Initialize Gemini Client
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY,
+// Initialize Gemini Client (gracefully handle missing key)
+const GEMINI_KEY = process.env.GEMINI_API_KEY;
+const ai = GEMINI_KEY ? new GoogleGenAI({
+  apiKey: GEMINI_KEY,
   httpOptions: {
     headers: {
       'User-Agent': 'aistudio-build',
     }
   }
-});
+}) : null;
 
 async function startServer() {
   const app = express();
@@ -90,8 +91,9 @@ async function startServer() {
     `;
 
     try {
-      if (!process.env.GEMINI_API_KEY) {
-        throw new Error("GEMINI_API_KEY environment variable is missing on the server.");
+      if (!GEMINI_KEY || !ai) {
+        res.status(503).json({ error: "AI advisor unavailable", details: "GEMINI_API_KEY is not configured. Set it in your .env file or environment variables to use this feature." });
+        return;
       }
 
       const response = await ai.models.generateContent({

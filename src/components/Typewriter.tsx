@@ -9,82 +9,91 @@ interface TypewriterProps {
   enabled?: boolean;
 }
 
-export const Typewriter: React.FC<TypewriterProps> = ({ text, className = "", onComplete, enabled = true }) => {
+export const Typewriter: React.FC<TypewriterProps> = ({
+  text,
+  className = "",
+  onComplete,
+  enabled = true,
+  speed = 14,
+}) => {
   const [displayedText, setDisplayedText] = useState("");
-  const [started, setStarted] = useState(false);
-  const elementRef = useRef<HTMLSpanElement | null>(null);
+  const [isTyping, setIsTyping] = useState(false);
+  const indexRef = useRef(0);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasCompletedRef = useRef(false);
-  const maxRevealedRef = useRef(0);
-
   const onCompleteRef = useRef(onComplete);
+  const textRef = useRef(text);
+
+  // Keep refs in sync
   useEffect(() => {
     onCompleteRef.current = onComplete;
   }, [onComplete]);
 
   useEffect(() => {
+    textRef.current = text;
+  }, [text]);
+
+  // Reset when disabled
+  useEffect(() => {
     if (!enabled) {
       setDisplayedText("");
-      setStarted(false);
+      setIsTyping(false);
+      indexRef.current = 0;
       hasCompletedRef.current = false;
-      maxRevealedRef.current = 0;
-      return;
+      if (timerRef.current !== null) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
     }
+  }, [enabled]);
 
-    if (hasCompletedRef.current) return;
+  // Main typing logic
+  useEffect(() => {
+    if (!enabled || hasCompletedRef.current) return;
 
-    const handleScroll = () => {
-      if (!elementRef.current || hasCompletedRef.current) return;
+    // Longer delay before starting for better anticipation
+    const startDelay = setTimeout(() => {
+      setIsTyping(true);
+      indexRef.current = 0;
+      setDisplayedText("");
 
-      const rect = elementRef.current.getBoundingClientRect();
-      const viewportHeight = window.innerHeight;
-
-      // Start revealing characters when the element enters from the bottom of the viewport (100% height)
-      // Reach 100% typing completion when the element scrolls to around 55% of the viewport height (approx middle screen)
-      const startTrigger = viewportHeight;
-      const endTrigger = viewportHeight * 0.55;
-
-      let progress = 0;
-      if (rect.top < startTrigger) {
-        progress = (startTrigger - rect.top) / (startTrigger - endTrigger);
-      }
-      progress = Math.max(0, Math.min(1, progress));
-
-      if (progress > 0 && !started) {
-        setStarted(true);
-      }
-
-      const targetLen = Math.floor(progress * text.length);
-      if (targetLen > maxRevealedRef.current) {
-        maxRevealedRef.current = targetLen;
-        setDisplayedText(text.substring(0, targetLen));
-      }
-
-      if (maxRevealedRef.current >= text.length) {
-        hasCompletedRef.current = true;
-        setDisplayedText(text);
-        if (onCompleteRef.current) {
-          onCompleteRef.current();
+      const typeChar = () => {
+        if (indexRef.current >= textRef.current.length) {
+          hasCompletedRef.current = true;
+          setIsTyping(false);
+          setDisplayedText(textRef.current);
+          onCompleteRef.current?.();
+          return;
         }
-      }
-    };
 
-    // Run initial scroll check on mount and resize
-    handleScroll();
+        indexRef.current++;
+        setDisplayedText(textRef.current.substring(0, indexRef.current));
+        timerRef.current = setTimeout(typeChar, speed);
+      };
 
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    window.addEventListener("resize", handleScroll);
+      timerRef.current = setTimeout(typeChar, speed);
+    }, 300);
 
     return () => {
-      window.removeEventListener("scroll", handleScroll);
-      window.removeEventListener("resize", handleScroll);
+      clearTimeout(startDelay);
+      if (timerRef.current !== null) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
     };
-  }, [enabled, text]);
+  }, [enabled, speed]);
 
   return (
-    <span ref={elementRef} className={className}>
+    <span className={className}>
       {displayedText}
-      {started && displayedText.length < text.length && (
-        <span className="inline-block w-1.5 h-4 ml-0.5 bg-indigo-400 animate-pulse align-middle" />
+      {isTyping && (
+        <span
+          className="inline-block w-[3px] h-[1.1em] ml-1 bg-gradient-to-b from-indigo-300 to-indigo-500 rounded-sm align-middle"
+          style={{
+            animation: "blink-cursor 0.5s cubic-bezier(0.4, 0, 0.2, 1) infinite",
+            boxShadow: "0 0 8px rgba(99,102,241,0.6), 0 0 20px rgba(99,102,241,0.2)",
+          }}
+        />
       )}
     </span>
   );

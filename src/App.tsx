@@ -15,7 +15,7 @@ import {
   Activity,
   Palette
 } from "lucide-react";
-import { motion, useInView } from "motion/react";
+import { motion } from "motion/react";
 
 // Import local constants and settings
 import {
@@ -73,7 +73,56 @@ export default function App() {
   // References
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const additionalSectionRef = useRef<HTMLElement>(null);
-  const isAdditionalSectionInView = useInView(additionalSectionRef, { amount: 0.15 });
+
+  // Scroll-triggered heading animation using IntersectionObserver
+  const [featuresHeadingEnabled, setFeaturesHeadingEnabled] = useState(false);
+  const [additionalHeadingEnabled, setAdditionalHeadingEnabled] = useState(false);
+  const [manyMoreHeadingEnabled, setManyMoreHeadingEnabled] = useState(false);
+  const [performanceHeadingEnabled, setPerformanceHeadingEnabled] = useState(false);
+  const headingTriggers = useRef([false, false, false, false]);
+
+  useEffect(() => {
+    if (!isFinished) return;
+
+    const observers: IntersectionObserver[] = [];
+    const sectionIds = ["features-section", "additional-features-section", "many-more-section", "performance-section"];
+    const headingSetters = [setFeaturesHeadingEnabled, setAdditionalHeadingEnabled, setManyMoreHeadingEnabled, setPerformanceHeadingEnabled];
+
+    sectionIds.forEach((id, idx) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+
+      const observer = new IntersectionObserver(
+        ([entry]) => {
+          if (entry.isIntersecting && !headingTriggers.current[idx]) {
+            headingTriggers.current[idx] = true;
+            headingSetters[idx](true);
+            observer.disconnect();
+          }
+        },
+        { threshold: 0.15, rootMargin: "0px 0px -50px 0px" }
+      );
+      observer.observe(el);
+      observers.push(observer);
+    });
+
+    return () => observers.forEach(o => o.disconnect());
+  }, [isFinished]);
+
+  // Additional features rotator - uses IntersectionObserver directly
+  const [isAdditionalSectionInView, setIsAdditionalSectionInView] = useState(false);
+
+  useEffect(() => {
+    const el = additionalSectionRef.current;
+    if (!el) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => setIsAdditionalSectionInView(entry.isIntersecting),
+      { threshold: 0.15 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   const [showNavbar, setShowNavbar] = useState(false);
 
@@ -489,7 +538,7 @@ export default function App() {
             
             {/* Logo - TWO SEPARATE elements, no layout, no sliding during typing */}
             {introPhase === "typing" ? (
-              <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
+              <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none overflow-hidden">
                 <pre
                   style={{
                     fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
@@ -497,15 +546,16 @@ export default function App() {
                     letterSpacing: "-0.05em",
                     lineHeight: "0.82",
                     textShadow: "0 0 0.2px currentColor",
-                    transform: "scale(2.2)",
+                    transform: "scale(1.6)",
+                    transformOrigin: "center center",
                   }}
-                  className="text-left text-[6.5px] min-[380px]:text-[7.5px] min-[480px]:text-[9px] sm:text-[10px] md:text-xs select-none overflow-x-visible whitespace-pre text-white"
+                  className="text-left text-[5.5px] min-[380px]:text-[6.5px] min-[480px]:text-[8px] sm:text-[10px] md:text-xs select-none overflow-x-visible whitespace-pre text-white leading-[0.82]"
                 >
                   {typedLogoLines.join("\n")}
                 </pre>
               </div>
             ) : (
-              <div className="relative overflow-visible min-h-[140px] sm:min-h-[160px] md:min-h-[180px] flex items-center justify-center lg:justify-start w-fit mx-auto lg:mx-0">
+              <div className="relative overflow-visible min-h-[120px] sm:min-h-[160px] md:min-h-[180px] flex items-center justify-center lg:justify-start w-full max-w-full lg:mx-0">
                 <motion.pre
                   initial={{ scale: 2.2, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
@@ -523,7 +573,7 @@ export default function App() {
                     textShadow: "0 0 0.2px currentColor",
                     transformOrigin: "center center",
                   }}
-                  className={`text-left text-[6.5px] min-[380px]:text-[7.5px] min-[480px]:text-[9px] sm:text-[10px] md:text-xs select-none overflow-x-visible whitespace-pre text-white w-fit mx-auto lg:mx-0 ${
+                  className={`text-left text-[5px] min-[380px]:text-[6.5px] min-[480px]:text-[8px] sm:text-[10px] md:text-xs select-none overflow-x-auto whitespace-pre text-white w-fit mx-auto lg:mx-0 scrollbar-none ${
                     isLogoSettled ? "animate-logo-float" : ""
                   }`}
                 >
@@ -658,7 +708,7 @@ export default function App() {
           {/* Top Divider */}
           <div className="w-full flex items-center justify-center gap-4 mb-8 sm:mb-12">
             <div className="h-[1px] flex-grow bg-gradient-to-r from-transparent via-white/10 to-white/10" />
-            <div className={`px-4 py-1.5 rounded-full text-[10px] font-mono tracking-widest uppercase ${THEMES[currentTheme].accentBg} ${THEMES[currentTheme].accentText} border ${THEMES[currentTheme].accentBorder} flex items-center gap-2 backdrop-blur-sm shadow-sm`}>
+            <div className={`px-4 py-1.5 rounded-full text-[10px] font-mono tracking-widest uppercase ${coreFeaturesHeaderLoaded ? `${THEMES[currentTheme].accentBg} ${THEMES[currentTheme].accentText} border ${THEMES[currentTheme].accentBorder}` : "bg-white/5 text-slate-500 border border-white/10"} flex items-center gap-2 backdrop-blur-sm shadow-sm`}>
               <Layers className="w-3.5 h-3.5" />
               <span>01 / CORE SYSTEMS</span>
             </div>
@@ -668,21 +718,47 @@ export default function App() {
           {/* Section Header */}
           <div className="flex flex-col gap-4 mb-8 sm:mb-12 text-center">
             <h2 className="font-sans font-black text-4xl sm:text-6xl text-white tracking-tight leading-none">
-              <Typewriter text="Launcher features" speed={14} enabled={isFinished} onComplete={() => setCoreFeaturesHeaderLoaded(true)} />
+              <Typewriter text="Launcher features" speed={14} enabled={featuresHeadingEnabled} onComplete={() => setCoreFeaturesHeaderLoaded(true)} />
             </h2>
           </div>
 
           {/* Features Column Stacks */}
           {coreFeaturesHeaderLoaded && (
             <motion.div 
-              initial={{ opacity: 0, y: 25 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+              initial="hidden"
+              animate="visible"
+              variants={{
+                hidden: { opacity: 0 },
+                visible: {
+                  opacity: 1,
+                  transition: {
+                    staggerChildren: 0.25,
+                    delayChildren: 0.2
+                  }
+                }
+              }}
               className="flex flex-col gap-20 md:gap-36"
             >
               
               {/* FEATURE 1: Manage many instances easily */}
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-8 md:gap-16 items-center">
+              <motion.div 
+                variants={{
+                  hidden: { opacity: 0, y: 60, scale: 0.93, rotateX: 5 },
+                  visible: { 
+                    opacity: 1, 
+                    y: 0, 
+                    scale: 1, 
+                    rotateX: 0,
+                    transition: { 
+                      type: "spring",
+                      stiffness: 80,
+                      damping: 15,
+                      mass: 0.8
+                    } 
+                  }
+                }}
+                className="grid grid-cols-1 md:grid-cols-12 gap-8 md:gap-16 items-center"
+              >
                 <div className="md:col-span-5 flex flex-col gap-4">
                   <span className={`text-xs font-mono font-bold uppercase tracking-wider ${THEMES[currentTheme].accentText}`}>
                     Instance Manager
@@ -717,10 +793,27 @@ export default function App() {
                     />
                   </div>
                 </div>
-              </div>
+              </motion.div>
 
               {/* FEATURE 2: Customize everything */}
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-8 md:gap-16 items-center">
+              <motion.div 
+                variants={{
+                  hidden: { opacity: 0, y: 60, scale: 0.93, rotateX: 5 },
+                  visible: {
+                    opacity: 1,
+                    y: 0,
+                    scale: 1,
+                    rotateX: 0,
+                    transition: {
+                      type: "spring",
+                      stiffness: 80,
+                      damping: 15,
+                      mass: 0.8
+                    }
+                  }
+                }}
+                className="grid grid-cols-1 md:grid-cols-12 gap-8 md:gap-16 items-center"
+              >
                 <div className="md:col-span-5 md:order-2 flex flex-col gap-4">
                   <span className={`text-xs font-mono font-bold uppercase tracking-wider ${THEMES[currentTheme].accentText}`}>
                     Theme Editor
@@ -755,10 +848,27 @@ export default function App() {
                     />
                   </div>
                 </div>
-              </div>
+              </motion.div>
 
               {/* FEATURE 3: Manage your Minecraft files */}
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-8 md:gap-16 items-center">
+              <motion.div 
+                variants={{
+                  hidden: { opacity: 0, y: 60, scale: 0.93, rotateX: 5 },
+                  visible: {
+                    opacity: 1,
+                    y: 0,
+                    scale: 1,
+                    rotateX: 0,
+                    transition: {
+                      type: "spring",
+                      stiffness: 80,
+                      damping: 15,
+                      mass: 0.8
+                    }
+                  }
+                }}
+                className="grid grid-cols-1 md:grid-cols-12 gap-8 md:gap-16 items-center"
+              >
                 <div className="md:col-span-5 flex flex-col gap-4">
                   <span className={`text-xs font-mono font-bold uppercase tracking-wider ${THEMES[currentTheme].accentText}`}>
                     Instance Edit Menu
@@ -793,7 +903,7 @@ export default function App() {
                     />
                   </div>
                 </div>
-              </div>
+              </motion.div>
 
             </motion.div>
           )}
@@ -805,14 +915,14 @@ export default function App() {
           ref={additionalSectionRef}
           className={`flex flex-col justify-center py-12 sm:py-16 relative scroll-mt-24 max-w-7xl mx-auto w-full px-4 md:px-8 border-t border-white/5 transition-all duration-[800ms] ${
             coreFeaturesHeaderLoaded
-              ? "opacity-100 filter-none"
-              : "opacity-10 pointer-events-none grayscale blur-[2px]"
+              ? "opacity-100 visible"
+              : "opacity-0 invisible pointer-events-none"
           }`}
         >
           {/* Top Divider */}
           <div className="w-full flex items-center justify-center gap-4 mb-8 sm:mb-12">
             <div className="h-[1px] flex-grow bg-gradient-to-r from-transparent via-white/10 to-white/10" />
-            <div className={`px-4 py-1.5 rounded-full text-[10px] font-mono tracking-widest uppercase bg-amber-500/10 text-amber-400 border border-amber-500/30 flex items-center gap-2 backdrop-blur-sm shadow-sm`}>
+            <div className={`px-4 py-1.5 rounded-full text-[10px] font-mono tracking-widest uppercase ${coreFeaturesHeaderLoaded ? `${THEMES[currentTheme].accentBg} ${THEMES[currentTheme].accentText} border ${THEMES[currentTheme].accentBorder}` : "bg-white/5 text-slate-500 border border-white/10"} flex items-center gap-2 backdrop-blur-sm shadow-sm`}>
               <Sparkles className="w-3.5 h-3.5" />
               <span>02 / EXTENDED SYSTEMS</span>
             </div>
@@ -822,7 +932,7 @@ export default function App() {
           {/* Section Header */}
           <div className="flex flex-col gap-2 mb-6 sm:mb-8 text-center max-w-3xl mx-auto">
             <h2 className="font-sans font-black text-4xl sm:text-6xl text-white tracking-tight leading-none">
-              <Typewriter text="Additional features" speed={14} enabled={coreFeaturesHeaderLoaded} onComplete={() => setAdditionalFeaturesHeaderLoaded(true)} />
+              <Typewriter text="Additional features" speed={14} enabled={additionalHeadingEnabled} onComplete={() => setAdditionalFeaturesHeaderLoaded(true)} />
             </h2>
           </div>
 
@@ -933,14 +1043,14 @@ export default function App() {
           id="many-more-section"
           className={`flex flex-col justify-center py-12 sm:py-16 relative scroll-mt-24 max-w-7xl mx-auto w-full px-4 md:px-8 border-t border-white/5 transition-all duration-[800ms] ${
             additionalFeaturesHeaderLoaded
-              ? "opacity-100 filter-none"
-              : "opacity-10 pointer-events-none grayscale blur-[2px]"
+              ? "opacity-100 visible"
+              : "opacity-0 invisible pointer-events-none"
           }`}
         >
           {/* Top Divider */}
           <div className="w-full flex items-center justify-center gap-4 mb-8 sm:mb-12">
             <div className="h-[1px] flex-grow bg-gradient-to-r from-transparent via-white/10 to-white/10" />
-            <div className={`px-4 py-1.5 rounded-full text-[10px] font-mono tracking-widest uppercase bg-fuchsia-500/10 text-fuchsia-400 border border-fuchsia-500/30 flex items-center gap-2 backdrop-blur-sm shadow-sm`}>
+            <div className={`px-4 py-1.5 rounded-full text-[10px] font-mono tracking-widest uppercase ${additionalFeaturesHeaderLoaded ? `${THEMES[currentTheme].accentBg} ${THEMES[currentTheme].accentText} border ${THEMES[currentTheme].accentBorder}` : "bg-white/5 text-slate-500 border border-white/10"} flex items-center gap-2 backdrop-blur-sm shadow-sm`}>
               <Layers className="w-3.5 h-3.5" />
               <span>03 / AUXILIARY TOOLS</span>
             </div>
@@ -950,7 +1060,7 @@ export default function App() {
           {/* Section Header */}
           <div className="flex flex-col gap-2 mb-6 sm:mb-8 text-center max-w-3xl mx-auto">
             <h2 className="font-sans font-black text-4xl sm:text-6xl text-white tracking-tight leading-none">
-              <Typewriter text="And many more features" speed={14} enabled={additionalFeaturesHeaderLoaded} onComplete={() => setManyMoreFeaturesHeaderLoaded(true)} />
+              <Typewriter text="And many more features" speed={14} enabled={manyMoreHeadingEnabled} onComplete={() => setManyMoreFeaturesHeaderLoaded(true)} />
             </h2>
           </div>
 
@@ -1005,14 +1115,14 @@ export default function App() {
           id="performance-section"
           className={`flex flex-col justify-center py-12 sm:py-16 relative scroll-mt-24 max-w-7xl mx-auto w-full px-4 md:px-8 border-t border-white/5 transition-all duration-[800ms] ${
             manyMoreFeaturesHeaderLoaded
-              ? "opacity-100 filter-none"
-              : "opacity-10 pointer-events-none grayscale blur-[2px]"
+              ? "opacity-100 visible"
+              : "opacity-0 invisible pointer-events-none"
           }`}
         >
           {/* Top Divider */}
           <div className="w-full flex items-center justify-center gap-4 mb-8 sm:mb-12">
             <div className="h-[1px] flex-grow bg-gradient-to-r from-transparent via-white/10 to-white/10" />
-            <div className={`px-4 py-1.5 rounded-full text-[10px] font-mono tracking-widest uppercase bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 flex items-center gap-2 backdrop-blur-sm shadow-sm`}>
+            <div className={`px-4 py-1.5 rounded-full text-[10px] font-mono tracking-widest uppercase ${manyMoreFeaturesHeaderLoaded ? `${THEMES[currentTheme].accentBg} ${THEMES[currentTheme].accentText} border ${THEMES[currentTheme].accentBorder}` : "bg-white/5 text-slate-500 border border-white/10"} flex items-center gap-2 backdrop-blur-sm shadow-sm`}>
               <Cpu className="w-3.5 h-3.5" />
               <span>04 / PERFORMANCE STATISTICS</span>
             </div>
@@ -1022,20 +1132,45 @@ export default function App() {
           {/* Section Header */}
           <div className="flex flex-col gap-2 mb-6 sm:mb-8 text-center max-w-3xl mx-auto">
             <h2 className="font-sans font-black text-4xl sm:text-6xl text-white tracking-tight leading-none">
-              <Typewriter text="Performance details" speed={14} enabled={manyMoreFeaturesHeaderLoaded} onComplete={() => setPerformanceHeaderLoaded(true)} />
+              <Typewriter text="Performance details" speed={14} enabled={performanceHeadingEnabled} onComplete={() => setPerformanceHeaderLoaded(true)} />
             </h2>
           </div>
 
           {performanceHeaderLoaded && (
             <motion.div
-              initial={{ opacity: 0, y: 25 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+              initial="hidden"
+              animate="visible"
+              variants={{
+                hidden: { opacity: 0 },
+                visible: {
+                  opacity: 1,
+                  transition: {
+                    staggerChildren: 0.18,
+                    delayChildren: 0.15
+                  }
+                }
+              }}
               className="grid grid-cols-1 lg:grid-cols-3 gap-8"
             >
               
               {/* PERFORMANCE CARD 1 */}
-              <div className="bg-black/20 rounded-2xl border border-white/5 p-8 flex flex-col gap-6 shadow-2xl relative overflow-hidden">
+              <motion.div
+                variants={{
+                  hidden: { opacity: 0, y: 40, scale: 0.92 },
+                  visible: {
+                    opacity: 1,
+                    y: 0,
+                    scale: 1,
+                    transition: {
+                      type: "spring",
+                      stiffness: 70,
+                      damping: 14,
+                      mass: 0.9
+                    }
+                  }
+                }}
+                className="bg-black/20 rounded-2xl border border-white/5 p-8 flex flex-col gap-6 shadow-2xl relative overflow-hidden"
+              >
                 <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/[0.02] rounded-full filter blur-2xl pointer-events-none" />
                 
                 <div className="flex items-center justify-between border-b border-white/5 pb-4">
@@ -1065,10 +1200,26 @@ export default function App() {
                 <p className="text-xs text-slate-400 leading-relaxed">
                   The launcher uses approximately <strong className="text-white font-semibold">300 MB of RAM</strong> while open with normal graphics, keeping your overall system fast and responsive.
                 </p>
-              </div>
+              </motion.div>
 
               {/* PERFORMANCE CARD 2 */}
-              <div className="bg-black/20 rounded-2xl border border-white/5 p-8 flex flex-col gap-6 shadow-2xl relative overflow-hidden">
+              <motion.div
+                variants={{
+                  hidden: { opacity: 0, y: 40, scale: 0.92 },
+                  visible: {
+                    opacity: 1,
+                    y: 0,
+                    scale: 1,
+                    transition: {
+                      type: "spring",
+                      stiffness: 70,
+                      damping: 14,
+                      mass: 0.9
+                    }
+                  }
+                }}
+                className="bg-black/20 rounded-2xl border border-white/5 p-8 flex flex-col gap-6 shadow-2xl relative overflow-hidden"
+              >
                 <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/[0.02] rounded-full filter blur-2xl pointer-events-none" />
                 
                 <div className="flex items-center justify-between border-b border-white/5 pb-4">
@@ -1096,10 +1247,26 @@ export default function App() {
                 <p className="text-xs text-slate-400 leading-relaxed">
                   When minimized to background mode, memory usage automatically drops to approximately <strong className="text-white font-semibold">30 MB of RAM</strong>, releasing system assets for maximum gaming resource allocation.
                 </p>
-              </div>
+              </motion.div>
 
               {/* PERFORMANCE CARD 3 */}
-              <div className="bg-black/20 rounded-2xl border border-white/5 p-8 flex flex-col gap-6 shadow-2xl relative overflow-hidden">
+              <motion.div
+                variants={{
+                  hidden: { opacity: 0, y: 40, scale: 0.92 },
+                  visible: {
+                    opacity: 1,
+                    y: 0,
+                    scale: 1,
+                    transition: {
+                      type: "spring",
+                      stiffness: 70,
+                      damping: 14,
+                      mass: 0.9
+                    }
+                  }
+                }}
+                className="bg-black/20 rounded-2xl border border-white/5 p-8 flex flex-col gap-6 shadow-2xl relative overflow-hidden"
+              >
                 <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/[0.02] rounded-full filter blur-2xl pointer-events-none" />
                 
                 <div className="flex items-center justify-between border-b border-white/5 pb-4">
@@ -1127,7 +1294,7 @@ export default function App() {
                 <p className="text-xs text-slate-400 leading-relaxed">
                   Based on benchmark testing, the launcher's optional JVM parameters provide an average performance improvement of approximately <strong className="text-white font-semibold">5%</strong>.
                 </p>
-              </div>
+              </motion.div>
 
             </motion.div>
           )}
