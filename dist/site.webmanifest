@@ -1,0 +1,17 @@
+{
+  "name": "NOTG Launcher",
+  "short_name": "NOTG",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#03050d",
+  "theme_color": "#6366f1",
+  "description": "NOTG Launcher — Minecraft Launcher. A powerful custom Minecraft launcher with multi-instance support, mod management, and built-in tools.",
+  "icons": [
+    {
+      "src": "/favicon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

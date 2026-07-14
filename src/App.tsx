@@ -13,11 +13,18 @@ import {
   FolderOpen,
   ChevronRight,
   Activity,
-  Palette
+  Palette,
+  Github,
+  Star,
+  GitFork,
+  ExternalLink,
+  CalendarDays,
+  Package,
+  FileArchive,
+  Code2
 } from "lucide-react";
 import { motion } from "motion/react";
 
-// Import local constants and settings
 import {
   LOGO_LINES,
   DESCRIPTION_TEXT,
@@ -26,67 +33,208 @@ import {
   EXTRA_FEATURES
 } from "./constants";
 
-// Import local components and datasets
 import { Typewriter } from "./components/Typewriter";
 import { SafeFeatureImage } from "./components/SafeFeatureImage";
 import { getAdditionalFeatures } from "./components/AdditionalFeaturesData";
 
-// Import images
 import homePageImg from "./Home Page.png";
 import customizeEverythingImg from "./Customize Everything.png";
 import manageEverythingImg from "./Manage Everything.png";
 import manageInstanceImg from "./Manage instance.png";
 import launcherLogoImg from "./NOTG-Launcher Logo.png";
 
+const GITHUB_REPO_URL = "https://github.com/EPICmaster-2149/NOTG-Launcher";
+const GITHUB_RELEASE_API = "https://api.github.com/repos/EPICmaster-2149/NOTG-Launcher/releases/latest";
+
+interface GitHubReleaseAsset {
+  name: string;
+  size: number;
+  browser_download_url: string;
+  download_count?: number;
+}
+
+interface GitHubReleaseInfo {
+  tag_name: string;
+  name: string;
+  html_url: string;
+  published_at: string;
+  body: string;
+  assets: GitHubReleaseAsset[];
+}
+
+const DEFAULT_RELEASE: GitHubReleaseInfo = {
+  tag_name: "v2.2.0",
+  name: "Update 2.2.0",
+  html_url: "https://github.com/EPICmaster-2149/NOTG-Launcher/releases/tag/v2.2.0",
+  published_at: "2026-06-25T18:22:26Z",
+  body: "# Upadate 2.2.0\n\n### What's New\n\n- The whole account window was updated\n- Offline skin mod (Customskinloader) is automatically configured\n- The offline skins can be uploaded and be used\n- Modpacks from modrinth can be directly browsed and installed\n- New optimised mode is available which can optimise minecraft running \n\n### Bug Fixes\n\n- The launcher was overall optimised to become much smoother\n- The video background has been optimised and its a bit less laggy\n- The size of the app is reduced very much\n- Lot of other small bugs an improvement have been made\n\n**Full Changelog**: https://github.com/EPICmaster-2149/NOTG-Launcher/compare/v1.2.1...v2.2.0",
+  assets: [
+    {
+      name: "NOTG.Launcher.Setup.exe",
+      size: 189180384,
+      browser_download_url: "https://github.com/EPICmaster-2149/NOTG-Launcher/releases/download/v2.2.0/NOTG.Launcher.Setup.exe",
+      download_count: 20
+    },
+    {
+      name: "NOTG.Launcher.zip",
+      size: 209167704,
+      browser_download_url: "https://github.com/EPICmaster-2149/NOTG-Launcher/releases/download/v2.2.0/NOTG.Launcher.zip",
+      download_count: 10
+    }
+  ]
+};
+
+const repoStats = [
+  { label: "Language", value: "Python", icon: Code2 },
+  { label: "Stars", value: "0", icon: Star },
+  { label: "Forks", value: "0", icon: GitFork }
+];
+
+const formatReleaseDate = (date: string) =>
+  new Intl.DateTimeFormat("en", {
+    month: "short",
+    day: "numeric",
+    year: "numeric"
+  }).format(new Date(date));
+
+const formatAssetSize = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+
+const renderInlineMarkdown = (text: string, keyPrefix: string): React.ReactNode[] => {
+  const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|\[[^\]]+\]\([^)]+\)|https?:\/\/\S+)/g);
+
+  return parts.filter(Boolean).map((part, index) => {
+    const key = `${keyPrefix}-${index}`;
+    const linkMatch = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+
+    if (linkMatch) {
+      return (
+        <a key={key} href={linkMatch[2]} target="_blank" rel="noreferrer" className="font-semibold text-indigo-300 hover:text-white underline decoration-indigo-400/40 underline-offset-4">
+          {linkMatch[1]}
+        </a>
+      );
+    }
+
+    if (/^https?:\/\//.test(part)) {
+      return (
+        <a key={key} href={part} target="_blank" rel="noreferrer" className="font-semibold text-indigo-300 hover:text-white underline decoration-indigo-400/40 underline-offset-4 break-words">
+          {part}
+        </a>
+      );
+    }
+
+    if (part.startsWith("**") && part.endsWith("**")) {
+      return <strong key={key} className="font-extrabold text-white">{part.slice(2, -2)}</strong>;
+    }
+
+    if (part.startsWith("*") && part.endsWith("*")) {
+      return <em key={key} className="italic text-slate-200">{part.slice(1, -1)}</em>;
+    }
+
+    return <React.Fragment key={key}>{part}</React.Fragment>;
+  });
+};
+
+const renderReleaseMarkdown = (markdown: string) => {
+  const lines = markdown.split(/\r?\n/);
+  const elements: React.ReactNode[] = [];
+  let listItems: string[] = [];
+
+  const flushList = () => {
+    if (listItems.length === 0) return;
+    elements.push(
+      <ul key={`list-${elements.length}`} className="space-y-2 pl-1">
+        {listItems.map((item, index) => (
+          <li key={`${item}-${index}`} className="flex gap-3 text-sm leading-6 text-slate-300">
+            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-400 shadow-[0_0_14px_rgba(99,102,241,0.8)]" />
+            <span>{renderInlineMarkdown(item, `li-${elements.length}-${index}`)}</span>
+          </li>
+        ))}
+      </ul>
+    );
+    listItems = [];
+  };
+
+  lines.forEach((rawLine, index) => {
+    const line = rawLine.trim();
+
+    if (!line) {
+      flushList();
+      return;
+    }
+
+    if (line.startsWith("- ")) {
+      listItems.push(line.slice(2));
+      return;
+    }
+
+    flushList();
+
+    if (line.startsWith("### ")) {
+      elements.push(<h4 key={index} className="pt-4 text-sm font-display font-extrabold uppercase tracking-widest text-indigo-300">{line.slice(4)}</h4>);
+      return;
+    }
+
+    if (line.startsWith("## ")) {
+      elements.push(<h3 key={index} className="pt-3 text-lg font-display font-black text-white">{line.slice(3)}</h3>);
+      return;
+    }
+
+    if (line.startsWith("# ")) {
+      elements.push(<h3 key={index} className="text-xl sm:text-2xl font-display font-black text-white">{line.slice(2)}</h3>);
+      return;
+    }
+
+    elements.push(<p key={index} className="text-sm leading-7 text-slate-300">{renderInlineMarkdown(line, `p-${index}`)}</p>);
+  });
+
+  flushList();
+  return elements;
+};
+
 export default function App() {
-  // Intro animation phase: 'typing' -> 'transitioning' -> 'settled' -> 'hidden'
   const [introPhase, setIntroPhase] = useState<"typing" | "transitioning" | "settled" | "hidden">("typing");
 
-  // Derived states from introPhase
   const isTypingLogo = introPhase === "typing";
   const isFinished = introPhase === "transitioning" || introPhase === "settled" || introPhase === "hidden";
   const isLogoSettled = introPhase === "settled" || introPhase === "hidden";
 
-  // Typed logo lines accumulator
   const [typedLogoLines, setTypedLogoLines] = useState<string[]>([]);
 
-  // Section Headings complete trigger states for cascading content animations
   const [coreFeaturesHeaderLoaded, setCoreFeaturesHeaderLoaded] = useState(false);
   const [additionalFeaturesHeaderLoaded, setAdditionalFeaturesHeaderLoaded] = useState(false);
   const [manyMoreFeaturesHeaderLoaded, setManyMoreFeaturesHeaderLoaded] = useState(false);
   const [performanceHeaderLoaded, setPerformanceHeaderLoaded] = useState(false);
+  const [githubHeaderLoaded, setGithubHeaderLoaded] = useState(false);
 
-  // Active theme based on scroll positioning
   const [currentTheme, setCurrentTheme] = useState<ThemeKey>("cosmic");
   const [scrollPercent, setScrollPercent] = useState(0);
 
-  // Interactive Download States
   const [downloadState, setDownloadState] = useState<"idle" | "downloading" | "completed">("idle");
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [brailleIdx, setBrailleIdx] = useState(0);
+  const [githubRelease, setGithubRelease] = useState<GitHubReleaseInfo>(DEFAULT_RELEASE);
+  const [releaseStatus, setReleaseStatus] = useState<"live" | "fallback" | "loading">("loading");
 
-  // Redesigned Additional Features selector states
   const [activeFeatureIdx, setActiveFeatureIdx] = useState(0);
   const [hoveredCardIdx, setHoveredCardIdx] = useState<number | null>(null);
   const additionalFeatures = getAdditionalFeatures();
 
-  // References
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const additionalSectionRef = useRef<HTMLElement>(null);
 
-  // Scroll-triggered heading animation using IntersectionObserver
   const [featuresHeadingEnabled, setFeaturesHeadingEnabled] = useState(false);
   const [additionalHeadingEnabled, setAdditionalHeadingEnabled] = useState(false);
   const [manyMoreHeadingEnabled, setManyMoreHeadingEnabled] = useState(false);
   const [performanceHeadingEnabled, setPerformanceHeadingEnabled] = useState(false);
-  const headingTriggers = useRef([false, false, false, false]);
+  const [githubHeadingEnabled, setGithubHeadingEnabled] = useState(false);
+  const headingTriggers = useRef([false, false, false, false, false]);
 
   useEffect(() => {
     if (!isFinished) return;
 
     const observers: IntersectionObserver[] = [];
-    const sectionIds = ["features-section", "additional-features-section", "many-more-section", "performance-section"];
-    const headingSetters = [setFeaturesHeadingEnabled, setAdditionalHeadingEnabled, setManyMoreHeadingEnabled, setPerformanceHeadingEnabled];
+    const sectionIds = ["features-section", "additional-features-section", "many-more-section", "performance-section", "github-section"];
+    const headingSetters = [setFeaturesHeadingEnabled, setAdditionalHeadingEnabled, setManyMoreHeadingEnabled, setPerformanceHeadingEnabled, setGithubHeadingEnabled];
 
     sectionIds.forEach((id, idx) => {
       const el = document.getElementById(id);
@@ -109,7 +257,6 @@ export default function App() {
     return () => observers.forEach(o => o.disconnect());
   }, [isFinished]);
 
-  // Additional features rotator - uses IntersectionObserver directly
   const [isAdditionalSectionInView, setIsAdditionalSectionInView] = useState(false);
 
   useEffect(() => {
@@ -126,7 +273,6 @@ export default function App() {
 
   const [showNavbar, setShowNavbar] = useState(false);
 
-  // Refs for particle animation (no re-renders needed)
   const isFinishedRef = useRef(isFinished);
   const isTypingLogoRef = useRef(isTypingLogo);
   const currentThemeRef = useRef(currentTheme);
@@ -144,10 +290,8 @@ export default function App() {
     currentThemeRef.current = currentTheme;
   }, [currentTheme]);
 
-  // SVG path for logo scale animation — starts big, shrinks to normal
   const logoScale = isTypingLogo ? 2.2 : 1;
 
-  // Rotator timer for additional features (pauses on exact hovered card, only works when section is in viewport)
   useEffect(() => {
     if (!isAdditionalSectionInView) return;
 
@@ -155,12 +299,11 @@ export default function App() {
       if (hoveredCardIdx === null) {
         setActiveFeatureIdx((prev: number) => (prev + 1) % additionalFeatures.length);
       }
-    }, 5000); // rotate showcase every 5s if not hovering over a card
+    }, 5000);
 
     return () => clearInterval(rotatorTimer);
   }, [hoveredCardIdx, isAdditionalSectionInView, additionalFeatures.length]);
 
-  // Interval for Braille animation during downloading state
   useEffect(() => {
     if (downloadState !== "downloading") return;
     const interval = setInterval(() => {
@@ -172,18 +315,15 @@ export default function App() {
   const brailleFrames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
   const brailleChar = brailleFrames[brailleIdx];
 
-  // Skip animation trigger
   const handleSkipAnimation = () => {
     setTypedLogoLines(LOGO_LINES);
     setIntroPhase("settled");
     setShowNavbar(true);
   };
 
-  // Interactive Launcher Download Handler
   const triggerDownload = () => {
     if (downloadState !== "idle") return;
 
-    // Trigger actual download of latest launcher setup executable immediately
     const link = document.createElement("a");
     link.href = "https://github.com/EPICmaster-2149/NOTG-Launcher/releases/latest/download/NOTG.Launcher.Setup.exe";
     link.setAttribute("download", "NOTG.Launcher.Setup.exe");
@@ -191,7 +331,6 @@ export default function App() {
     link.click();
     document.body.removeChild(link);
 
-    // Set downloading state which animates Braille for exactly 3 seconds
     setDownloadState("downloading");
 
     setTimeout(() => {
@@ -199,7 +338,30 @@ export default function App() {
     }, 3000);
   };
 
-  // 1. Scroll percentage & Theme transition tracker
+  useEffect(() => {
+    let isMounted = true;
+
+    fetch(GITHUB_RELEASE_API, { headers: { Accept: "application/vnd.github+json" } })
+      .then((response) => {
+        if (!response.ok) throw new Error("GitHub release request failed");
+        return response.json() as Promise<GitHubReleaseInfo>;
+      })
+      .then((release) => {
+        if (!isMounted) return;
+        setGithubRelease(release);
+        setReleaseStatus("live");
+      })
+      .catch(() => {
+        if (!isMounted) return;
+        setGithubRelease(DEFAULT_RELEASE);
+        setReleaseStatus("fallback");
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   useEffect(() => {
     const handleScroll = () => {
       const scrollY = window.scrollY;
@@ -212,11 +374,14 @@ export default function App() {
       const manyMoreEl = document.getElementById("many-more-section");
       const customizationEl = document.getElementById("customization-section");
       const performanceEl = document.getElementById("performance-section");
+      const githubEl = document.getElementById("github-section");
 
       if (featuresEl) {
         const triggerThreshold = window.innerHeight * 0.85;
 
-        if (performanceEl && performanceEl.getBoundingClientRect().top <= triggerThreshold && manyMoreFeaturesHeaderLoaded) {
+        if (githubEl && githubEl.getBoundingClientRect().top <= triggerThreshold && performanceHeaderLoaded) {
+          setCurrentTheme("ocean");
+        } else if (performanceEl && performanceEl.getBoundingClientRect().top <= triggerThreshold && manyMoreFeaturesHeaderLoaded) {
           setCurrentTheme("ocean");
         } else if (customizationEl && customizationEl.getBoundingClientRect().top <= triggerThreshold && additionalFeaturesHeaderLoaded) {
           setCurrentTheme("ender");
@@ -248,9 +413,8 @@ export default function App() {
     handleScroll();
 
     return () => window.removeEventListener("scroll", handleScroll);
-  }, [coreFeaturesHeaderLoaded, additionalFeaturesHeaderLoaded, manyMoreFeaturesHeaderLoaded]);
+  }, [coreFeaturesHeaderLoaded, additionalFeaturesHeaderLoaded, manyMoreFeaturesHeaderLoaded, performanceHeaderLoaded]);
 
-  // 2. High-Performance, lightweight floating particles wave
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -355,7 +519,6 @@ export default function App() {
     };
   }, []);
 
-  // 3. Sequential Typewriter Intro Controller
   useEffect(() => {
     if (!isTypingLogo) return;
 
@@ -385,7 +548,6 @@ export default function App() {
       } else {
         clearInterval(typeTimer);
         
-        // Typing done → transition to shrink to place
         setTimeout(() => {
           setTypedLogoLines(LOGO_LINES);
           setIntroPhase("transitioning");
@@ -404,7 +566,6 @@ export default function App() {
     return () => clearInterval(typeTimer);
   }, [isTypingLogo]);
 
-  // Prevent scrolling during starting intro animation
   useEffect(() => {
     if (introPhase === "typing") {
       document.body.style.overflow = "hidden";
@@ -422,6 +583,8 @@ export default function App() {
   const logoProgressPercent = isFinished
     ? 100
     : Math.round((typedLogoLines.filter((line: string) => line.trim().length > 0).length / LOGO_LINES.length) * 100) || 0;
+  const totalReleaseDownloads = githubRelease.assets.reduce((sum, asset) => sum + (asset.download_count || 0), 0);
+  const releaseStatusText = releaseStatus === "live" ? "Live from GitHub" : releaseStatus === "loading" ? "Checking GitHub" : "Fallback notes";
 
   return (
     <div
@@ -429,13 +592,10 @@ export default function App() {
       style={{ background: THEMES[currentTheme].bgGradientStyle }}
       className={`relative min-h-screen transition-all duration-1000 ease-in-out select-none overflow-x-hidden ${THEMES[currentTheme].textColor}`}
     >
-      {/* Wave Symbol Background Canvas */}
       <canvas ref={canvasRef} className="fixed inset-0 w-full h-full pointer-events-none z-0 animate-[pulse_10s_ease-in-out_infinite]" />
 
-      {/* Cinematic Centered Intro Overlay — only visible during typing */}
       {introPhase === "typing" && (
         <div className="fixed inset-0 z-30 bg-[#03050d]/80 backdrop-blur-md">
-          {/* Pulsing Ambient Glow */}
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden">
             <motion.div 
               animate={{
@@ -451,7 +611,6 @@ export default function App() {
             />
           </div>
 
-          {/* Skip Intro Button */}
           <div className="absolute bottom-16 left-0 right-0 z-50 flex items-center justify-center py-4 px-6 pointer-events-auto">
             <motion.button
               id="fast-skip-trigger"
@@ -468,12 +627,10 @@ export default function App() {
         </div>
       )}
 
-      {/* Overlay fade-out transition */}
       {introPhase === "transitioning" && (
         <div className="fixed inset-0 z-30 transition-all duration-[1500ms] ease-[cubic-bezier(0.16,1,0.3,1)] opacity-0 pointer-events-none scale-95 blur-md bg-[#03050d]/80" />
       )}
 
-      {/* Modern Top Dropdown Header */}
       <header
         id="navbar-header"
         className={`fixed top-0 left-0 right-0 z-40 h-20 border-b border-white/10 transition-all duration-700 ease-out backdrop-blur-lg flex items-center justify-between px-4 sm:px-6 md:px-12 bg-black/60 shadow-xl shadow-black/40 ${
@@ -525,18 +682,14 @@ export default function App() {
         </div>
       </header>
 
-      {/* MAIN CONTAINER LAYER */}
       <main className={`relative ${isFinished ? "z-10" : "z-50 pointer-events-none"} w-full max-w-[1500px] mx-auto px-4 sm:px-6 md:px-12 xl:px-16 flex flex-col pt-24 sm:pt-28 md:pt-32 gap-12 md:gap-16`}>
         
-        {/* HERO AREA SECTION */}
         <section
           id="hero-section"
           className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center min-h-0 lg:min-h-[85vh] py-8 w-full"
         >
-          {/* Left Column: Logo & Info */}
           <div className="lg:col-span-5 flex flex-col gap-6 justify-center">
             
-            {/* Logo - TWO SEPARATE elements, no layout, no sliding during typing */}
             {introPhase === "typing" ? (
               <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none overflow-hidden">
                 <pre
@@ -582,7 +735,6 @@ export default function App() {
               </div>
             )}
 
-            {/* Launcher description container — fades in after logo settles */}
             <motion.div
               initial={{ opacity: 0, y: 15 }}
               animate={isFinished ? { opacity: 1, y: 0 } : { opacity: 0, y: 15 }}
@@ -594,7 +746,6 @@ export default function App() {
               </p>
             </motion.div>
 
-            {/* Action Indicators */}
             <div
               className={`flex flex-wrap items-center gap-4 transition-all duration-[1200ms] ease-[cubic-bezier(0.16,1,0.3,1)] delay-[600ms] ${
                 isFinished ? "opacity-100 translate-y-0 scale-100" : "opacity-0 translate-y-8 scale-95 pointer-events-none"
@@ -637,7 +788,6 @@ export default function App() {
             </div>
           </div>
 
-          {/* Right Column: Actual uploaded screenshot (Home Page.png) */}
           <div className="lg:col-span-7 flex items-center justify-center w-full">
             <div
               className={`relative w-full rounded-2xl overflow-hidden border border-white/10 bg-slate-950/80 p-1.5 transition-all duration-[1500ms] ease-[cubic-bezier(0.16,1,0.3,1)] delay-[300ms] ${THEMES[currentTheme].shadowGlow} ${
@@ -700,12 +850,10 @@ export default function App() {
           </div>
         </section>
 
-        {/* SECTION 2: Core Launcher Features Section */}
         <section
           id="features-section"
           className="flex flex-col justify-center py-12 sm:py-16 relative scroll-mt-24 max-w-7xl mx-auto w-full px-4 md:px-8 border-t border-white/5"
         >
-          {/* Top Divider */}
           <div className="w-full flex items-center justify-center gap-4 mb-8 sm:mb-12">
             <div className="h-[1px] flex-grow bg-gradient-to-r from-transparent via-white/10 to-white/10" />
             <div className={`px-4 py-1.5 rounded-full text-[10px] font-mono tracking-widest uppercase ${coreFeaturesHeaderLoaded ? `${THEMES[currentTheme].accentBg} ${THEMES[currentTheme].accentText} border ${THEMES[currentTheme].accentBorder}` : "bg-white/5 text-slate-500 border border-white/10"} flex items-center gap-2 backdrop-blur-sm shadow-sm`}>
@@ -715,14 +863,12 @@ export default function App() {
             <div className="h-[1px] flex-grow bg-gradient-to-l from-transparent via-white/10 to-white/10" />
           </div>
 
-          {/* Section Header */}
           <div className="flex flex-col gap-4 mb-8 sm:mb-12 text-center">
             <h2 className="font-sans font-black text-4xl sm:text-6xl text-white tracking-tight leading-none">
               <Typewriter text="Launcher features" speed={14} enabled={featuresHeadingEnabled} onComplete={() => setCoreFeaturesHeaderLoaded(true)} />
             </h2>
           </div>
 
-          {/* Features Column Stacks */}
           {coreFeaturesHeaderLoaded && (
             <motion.div 
               initial="hidden"
@@ -740,7 +886,6 @@ export default function App() {
               className="flex flex-col gap-20 md:gap-36"
             >
               
-              {/* FEATURE 1: Manage many instances easily */}
               <motion.div 
                 variants={{
                   hidden: { opacity: 0, y: 60, scale: 0.93, rotateX: 5 },
@@ -795,7 +940,6 @@ export default function App() {
                 </div>
               </motion.div>
 
-              {/* FEATURE 2: Customize everything */}
               <motion.div 
                 variants={{
                   hidden: { opacity: 0, y: 60, scale: 0.93, rotateX: 5 },
@@ -850,7 +994,6 @@ export default function App() {
                 </div>
               </motion.div>
 
-              {/* FEATURE 3: Manage your Minecraft files */}
               <motion.div 
                 variants={{
                   hidden: { opacity: 0, y: 60, scale: 0.93, rotateX: 5 },
@@ -909,7 +1052,6 @@ export default function App() {
           )}
         </section>
 
-        {/* ADDITIONAL FEATURES SECTION */}
         <section
           id="additional-features-section"
           ref={additionalSectionRef}
@@ -919,7 +1061,6 @@ export default function App() {
               : "opacity-0 invisible pointer-events-none"
           }`}
         >
-          {/* Top Divider */}
           <div className="w-full flex items-center justify-center gap-4 mb-8 sm:mb-12">
             <div className="h-[1px] flex-grow bg-gradient-to-r from-transparent via-white/10 to-white/10" />
             <div className={`px-4 py-1.5 rounded-full text-[10px] font-mono tracking-widest uppercase ${coreFeaturesHeaderLoaded ? `${THEMES[currentTheme].accentBg} ${THEMES[currentTheme].accentText} border ${THEMES[currentTheme].accentBorder}` : "bg-white/5 text-slate-500 border border-white/10"} flex items-center gap-2 backdrop-blur-sm shadow-sm`}>
@@ -929,14 +1070,12 @@ export default function App() {
             <div className="h-[1px] flex-grow bg-gradient-to-l from-transparent via-white/10 to-white/10" />
           </div>
 
-          {/* Section Header */}
           <div className="flex flex-col gap-2 mb-6 sm:mb-8 text-center max-w-3xl mx-auto">
             <h2 className="font-sans font-black text-4xl sm:text-6xl text-white tracking-tight leading-none">
               <Typewriter text="Additional features" speed={14} enabled={additionalHeadingEnabled} onComplete={() => setAdditionalFeaturesHeaderLoaded(true)} />
             </h2>
           </div>
 
-          {/* Unified Split-Screen Interactive Showcase Console */}
           {additionalFeaturesHeaderLoaded && (
             <motion.div 
               initial={{ opacity: 0, y: 25 }}
@@ -944,7 +1083,6 @@ export default function App() {
               transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
               className="grid grid-cols-1 lg:grid-cols-12 gap-8 md:gap-12 items-stretch mb-12"
             >
-              {/* Left Column: Selector List */}
               <div className="lg:col-span-5 flex flex-col gap-4 justify-start">
                 <span className="text-[10px] font-mono text-amber-500/70 uppercase tracking-widest font-bold">Select Feature Overview</span>
                 
@@ -986,7 +1124,6 @@ export default function App() {
                           </span>
                         </div>
 
-                        {/* Slide-out description panel inside selector */}
                         <motion.div
                           initial={false}
                           animate={{ height: isActive ? "auto" : 0, opacity: isActive ? 1 : 0 }}
@@ -998,7 +1135,6 @@ export default function App() {
                           </p>
                         </motion.div>
 
-                        {/* Interactive progress bar */}
                         {isActive && hoveredCardIdx !== idx && (
                           <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-amber-500/10">
                             <motion.div
@@ -1015,7 +1151,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Right Column: High-Fidelity Simplified Mockup Viewport */}
               <div className="lg:col-span-7 flex flex-col justify-center">
                 <motion.div
                   key={activeFeatureIdx}
@@ -1038,7 +1173,6 @@ export default function App() {
           )}
         </section>
 
-        {/* AND MANY MORE FEATURES SECTION */}
         <section
           id="many-more-section"
           className={`flex flex-col justify-center py-12 sm:py-16 relative scroll-mt-24 max-w-7xl mx-auto w-full px-4 md:px-8 border-t border-white/5 transition-all duration-[800ms] ${
@@ -1047,7 +1181,6 @@ export default function App() {
               : "opacity-0 invisible pointer-events-none"
           }`}
         >
-          {/* Top Divider */}
           <div className="w-full flex items-center justify-center gap-4 mb-8 sm:mb-12">
             <div className="h-[1px] flex-grow bg-gradient-to-r from-transparent via-white/10 to-white/10" />
             <div className={`px-4 py-1.5 rounded-full text-[10px] font-mono tracking-widest uppercase ${additionalFeaturesHeaderLoaded ? `${THEMES[currentTheme].accentBg} ${THEMES[currentTheme].accentText} border ${THEMES[currentTheme].accentBorder}` : "bg-white/5 text-slate-500 border border-white/10"} flex items-center gap-2 backdrop-blur-sm shadow-sm`}>
@@ -1057,14 +1190,12 @@ export default function App() {
             <div className="h-[1px] flex-grow bg-gradient-to-l from-transparent via-white/10 to-white/10" />
           </div>
 
-          {/* Section Header */}
           <div className="flex flex-col gap-2 mb-6 sm:mb-8 text-center max-w-3xl mx-auto">
             <h2 className="font-sans font-black text-4xl sm:text-6xl text-white tracking-tight leading-none">
               <Typewriter text="And many more features" speed={14} enabled={manyMoreHeadingEnabled} onComplete={() => setManyMoreFeaturesHeaderLoaded(true)} />
             </h2>
           </div>
 
-          {/* Clean, attractive and performant Bento Grid presentation */}
           {manyMoreFeaturesHeaderLoaded && (
             <motion.div 
               initial="hidden"
@@ -1110,7 +1241,6 @@ export default function App() {
           )}
         </section>
 
-        {/* PERFORMANCE METRICS SECTION */}
         <section
           id="performance-section"
           className={`flex flex-col justify-center py-12 sm:py-16 relative scroll-mt-24 max-w-7xl mx-auto w-full px-4 md:px-8 border-t border-white/5 transition-all duration-[800ms] ${
@@ -1119,7 +1249,6 @@ export default function App() {
               : "opacity-0 invisible pointer-events-none"
           }`}
         >
-          {/* Top Divider */}
           <div className="w-full flex items-center justify-center gap-4 mb-8 sm:mb-12">
             <div className="h-[1px] flex-grow bg-gradient-to-r from-transparent via-white/10 to-white/10" />
             <div className={`px-4 py-1.5 rounded-full text-[10px] font-mono tracking-widest uppercase ${manyMoreFeaturesHeaderLoaded ? `${THEMES[currentTheme].accentBg} ${THEMES[currentTheme].accentText} border ${THEMES[currentTheme].accentBorder}` : "bg-white/5 text-slate-500 border border-white/10"} flex items-center gap-2 backdrop-blur-sm shadow-sm`}>
@@ -1129,7 +1258,6 @@ export default function App() {
             <div className="h-[1px] flex-grow bg-gradient-to-l from-transparent via-white/10 to-white/10" />
           </div>
 
-          {/* Section Header */}
           <div className="flex flex-col gap-2 mb-6 sm:mb-8 text-center max-w-3xl mx-auto">
             <h2 className="font-sans font-black text-4xl sm:text-6xl text-white tracking-tight leading-none">
               <Typewriter text="Performance details" speed={14} enabled={performanceHeadingEnabled} onComplete={() => setPerformanceHeaderLoaded(true)} />
@@ -1153,7 +1281,6 @@ export default function App() {
               className="grid grid-cols-1 lg:grid-cols-3 gap-8"
             >
               
-              {/* PERFORMANCE CARD 1 */}
               <motion.div
                 variants={{
                   hidden: { opacity: 0, y: 40, scale: 0.92 },
@@ -1202,7 +1329,6 @@ export default function App() {
                 </p>
               </motion.div>
 
-              {/* PERFORMANCE CARD 2 */}
               <motion.div
                 variants={{
                   hidden: { opacity: 0, y: 40, scale: 0.92 },
@@ -1249,7 +1375,6 @@ export default function App() {
                 </p>
               </motion.div>
 
-              {/* PERFORMANCE CARD 3 */}
               <motion.div
                 variants={{
                   hidden: { opacity: 0, y: 40, scale: 0.92 },
@@ -1300,9 +1425,159 @@ export default function App() {
           )}
         </section>
 
+        <section
+          id="github-section"
+          className={`flex flex-col justify-center py-12 sm:py-16 relative scroll-mt-24 max-w-7xl mx-auto w-full px-4 md:px-8 border-t border-white/5 transition-all duration-[800ms] ${
+            performanceHeaderLoaded
+              ? "opacity-100 visible"
+              : "opacity-0 invisible pointer-events-none"
+          }`}
+        >
+          <div className="w-full flex items-center justify-center gap-4 mb-8 sm:mb-12">
+            <div className="h-[1px] flex-grow bg-gradient-to-r from-transparent via-white/10 to-white/10" />
+            <div className={`px-4 py-1.5 rounded-full text-[10px] font-mono tracking-widest uppercase ${performanceHeaderLoaded ? `${THEMES[currentTheme].accentBg} ${THEMES[currentTheme].accentText} border ${THEMES[currentTheme].accentBorder}` : "bg-white/5 text-slate-500 border border-white/10"} flex items-center gap-2 backdrop-blur-sm shadow-sm`}>
+              <Github className="w-3.5 h-3.5" />
+              <span>05 / SOURCE CODE</span>
+            </div>
+            <div className="h-[1px] flex-grow bg-gradient-to-l from-transparent via-white/10 to-white/10" />
+          </div>
+
+          <div className="flex flex-col gap-2 mb-6 sm:mb-8 text-center max-w-3xl mx-auto">
+            <h2 className="font-sans font-black text-3xl sm:text-5xl text-white tracking-tight leading-none">
+              <Typewriter text="Check GitHub" speed={14} enabled={githubHeadingEnabled} onComplete={() => setGithubHeaderLoaded(true)} />
+            </h2>
+          </div>
+
+          {githubHeaderLoaded && (
+            <motion.div
+              initial="hidden"
+              animate="visible"
+              variants={{
+                hidden: { opacity: 0 },
+                visible: {
+                  opacity: 1,
+                  transition: {
+                    staggerChildren: 0.14,
+                    delayChildren: 0.1
+                  }
+                }
+              }}
+              className="grid grid-cols-1 xl:grid-cols-12 gap-6 lg:gap-8"
+            >
+              <motion.a
+                href={GITHUB_REPO_URL}
+                target="_blank"
+                rel="noreferrer"
+                variants={{
+                  hidden: { opacity: 0, y: 24, scale: 0.97 },
+                  visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.55, ease: [0.16, 1, 0.3, 1] } }
+                }}
+                whileHover={{ y: -5 }}
+                whileTap={{ scale: 0.99 }}
+                className="xl:col-span-5 group relative overflow-hidden rounded-2xl border border-white/10 bg-black/25 p-5 sm:p-6 shadow-2xl backdrop-blur-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300/70"
+              >
+                <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-indigo-300/60 to-transparent" />
+                <div className="absolute right-0 top-0 h-40 w-40 rounded-full bg-indigo-400/[0.04] blur-3xl" />
+
+                <div className="relative flex flex-col gap-6">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-center gap-4 min-w-0">
+                      <img
+                        src="https://avatars.githubusercontent.com/u/210232365?v=4"
+                        alt="EPICmaster-2149 GitHub avatar"
+                        className="h-14 w-14 shrink-0 rounded-2xl border border-white/10 bg-slate-900 object-cover shadow-lg"
+                        referrerPolicy="no-referrer"
+                        loading="lazy"
+                      />
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-widest text-indigo-300">
+                          <Github className="h-3.5 w-3.5" />
+                          <span>EPICmaster-2149</span>
+                        </div>
+                        <h3 className="mt-1 truncate font-display text-2xl sm:text-3xl font-black text-white">
+                          NOTG-Launcher
+                        </h3>
+                      </div>
+                    </div>
+                    <div className="rounded-xl border border-white/10 bg-white/5 p-2 text-slate-300 transition-colors group-hover:border-indigo-300/40 group-hover:text-white">
+                      <ExternalLink className="h-4 w-4" />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-3">
+                    {repoStats.map((stat) => {
+                      const Icon = stat.icon;
+                      return (
+                        <div key={stat.label} className="rounded-xl border border-white/5 bg-black/30 p-3">
+                          <div className="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-widest text-slate-500">
+                            <Icon className="h-3.5 w-3.5 text-indigo-400" />
+                            <span>{stat.label}</span>
+                          </div>
+                          <div className="mt-2 font-mono text-sm font-bold text-white">{stat.value}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="flex flex-col gap-3 rounded-xl border border-indigo-400/10 bg-indigo-400/[0.03] p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-[10px] font-mono uppercase tracking-widest text-indigo-300">{releaseStatusText}</span>
+                      <span className="rounded-full border border-white/10 bg-black/30 px-2.5 py-1 text-[10px] font-mono text-slate-300">{githubRelease.tag_name}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-slate-400">
+                      <CalendarDays className="h-3.5 w-3.5 text-indigo-400" />
+                      <span>Latest release published {formatReleaseDate(githubRelease.published_at)}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-slate-400">
+                      <Download className="h-3.5 w-3.5 text-indigo-400" />
+                      <span>{totalReleaseDownloads} tracked downloads across release assets</span>
+                    </div>
+                  </div>
+                </div>
+              </motion.a>
+
+              <motion.div
+                variants={{
+                  hidden: { opacity: 0, y: 24, scale: 0.97 },
+                  visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.55, ease: [0.16, 1, 0.3, 1] } }
+                }}
+                className="xl:col-span-7 rounded-2xl border border-white/10 bg-[#050912]/90 shadow-2xl overflow-hidden backdrop-blur-md"
+              >
+                <div className="flex flex-col gap-4 border-b border-white/10 bg-white/[0.03] px-5 py-4 sm:px-6 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-widest text-indigo-300">
+                      <Package className="h-3.5 w-3.5" />
+                      <span>Latest Release Notes</span>
+                    </div>
+                    <h3 className="mt-1 truncate font-display text-xl sm:text-2xl font-black text-white">
+                      {githubRelease.name || githubRelease.tag_name}
+                    </h3>
+                  </div>
+                  <a
+                    href={githubRelease.html_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-xs font-display font-bold text-slate-200 transition-colors hover:border-indigo-300/40 hover:bg-indigo-400/10 hover:text-white"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" />
+                    <span>Open Release</span>
+                  </a>
+                </div>
+
+                <div className="min-w-0 p-5 sm:p-6">
+                  <div className="rounded-xl border border-white/10 bg-black/35 p-5 sm:p-6 font-sans shadow-inner shadow-black/30">
+                    <div className="space-y-4">
+                      {renderReleaseMarkdown(githubRelease.body)}
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </section>
+
         </main>
 
-      {/* FOOTER */}
       <footer id="app-footer" className="relative z-10 border-t border-white/10 bg-slate-950/80 backdrop-blur-lg mt-32 py-16">
         <div className="max-w-7xl mx-auto px-6 md:px-12 flex flex-col md:flex-row items-center justify-between gap-8">
           <div className="flex flex-col gap-3 items-center md:items-start text-center md:text-left">
@@ -1327,9 +1602,6 @@ export default function App() {
             </p>
           </div>
 
-          <div className="flex items-center gap-6 text-[10px] text-slate-500 font-mono">
-            <span>© 2026 NOTG</span>
-          </div>
         </div>
       </footer>
 
